@@ -21,8 +21,15 @@
 #include <limits>
 #include <ostream>
 #include <string>
+#include <list>
 #include <system_error>
 #include "CryptoNote.h"
+#include <system_error>
+#include <boost/optional.hpp>
+#include "CryptoTypes.h"
+#include "crypto/crypto.h"
+#include "CryptoNoteCore/CryptoNoteBasic.h"
+#include "ITransfersContainer.h"
 
 namespace CryptoNote {
 
@@ -62,19 +69,26 @@ struct WalletLegacyTransaction {
   WalletLegacyTransactionState state;
 };
 
-class IWalletLegacyObserver {
-public:
-  virtual ~IWalletLegacyObserver() {}
+  using PaymentId = Crypto::Hash;
+  struct Payments {
+  PaymentId paymentId;
+  std::vector<WalletLegacyTransaction> transactions;
+};
+  static_assert(std::is_move_constructible<Payments>::value, "Payments is not move constructible");
+  
+  class IWalletLegacyObserver {
+  public:
+    virtual ~IWalletLegacyObserver() {}
 
-  virtual void initCompleted(std::error_code result) {}
-  virtual void saveCompleted(std::error_code result) {}
-  virtual void synchronizationProgressUpdated(uint32_t current, uint32_t total) {}
-  virtual void synchronizationCompleted(std::error_code result) {}
-  virtual void actualBalanceUpdated(uint64_t actualBalance) {}
-  virtual void pendingBalanceUpdated(uint64_t pendingBalance) {}
-  virtual void externalTransactionCreated(TransactionId transactionId) {}
-  virtual void sendTransactionCompleted(TransactionId transactionId, std::error_code result) {}
-  virtual void transactionUpdated(TransactionId transactionId) {}
+    virtual void initCompleted(std::error_code result) {}
+    virtual void saveCompleted(std::error_code result) {}
+    virtual void synchronizationProgressUpdated(uint32_t current, uint32_t total) {}
+    virtual void synchronizationCompleted(std::error_code result) {}
+    virtual void actualBalanceUpdated(uint64_t actualBalance) {}
+    virtual void pendingBalanceUpdated(uint64_t pendingBalance) {}
+    virtual void externalTransactionCreated(TransactionId transactionId) {}
+    virtual void sendTransactionCompleted(TransactionId transactionId, std::error_code result) {}
+    virtual void transactionUpdated(TransactionId transactionId) {}
 };
 
 class IWalletLegacy {
@@ -104,10 +118,16 @@ public:
 
   virtual TransactionId findTransactionByTransferId(TransferId transferId) = 0;
   
+  virtual TransactionId sendFusionTransaction(const std::list<TransactionOutputInformation>& fusionInputs, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
+  
+  virtual size_t estimateFusion(const uint64_t& threshold) = 0;
+  virtual std::list<TransactionOutputInformation> selectFusionTransfersToSend(uint64_t threshold, size_t minInputCount, size_t maxInputCount) = 0; 
+  
   virtual bool getTransaction(TransactionId transactionId, WalletLegacyTransaction& transaction) = 0;
   virtual bool getTransfer(TransferId transferId, WalletLegacyTransfer& transfer) = 0;
 
   virtual TransactionId sendTransaction(const WalletLegacyTransfer& transfer, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
+  
   virtual TransactionId sendTransaction(const std::vector<WalletLegacyTransfer>& transfers, uint64_t fee, const std::string& extra = "", uint64_t mixIn = 0, uint64_t unlockTimestamp = 0) = 0;
   virtual std::error_code cancelTransaction(size_t transferId) = 0;
 
